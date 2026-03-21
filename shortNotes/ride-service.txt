@@ -1,0 +1,602 @@
+When to use what?
+🔹200 OK:
+-> You are fetching data (GET)
+-> Or request is successful but no new resource created
+
+🔹201 Created:
+-> You create something new in DB (POST)
+-> Want to receive a response for ur request
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+Installation commands-
+
+1️⃣ Redis-
+
+docker run -d --name redis -p 6379:6379 redis
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+2️⃣ Nginx [In ur project working directory (PWD) ie. Root directory]-
+
+docker run -d --name nginx -p 8080:80 -v ${PWD}/infra/gateway/nginx.conf:/etc/nginx/nginx.conf nginx
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+3️⃣ ZooKeeper (Kafka compatible version)-
+
+docker run -d --name zookeeper -p 2181:2181 `
+-e ZOOKEEPER_CLIENT_PORT=2181 `
+-e ZOOKEEPER_TICK_TIME=2000 `
+confluentinc/cp-zookeeper:7.5.0
+
+
+NOTE-
+Must to be installed before Kafka
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+4️⃣ Kafka (ZooKeeper compatible version ie. confluent 7.5)-
+
+docker run -d --name kafka -p 9092:9092 `
+-e KAFKA_BROKER_ID=1 `
+-e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 `
+-e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 `
+-e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 `
+-e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 `
+-e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 `
+--link zookeeper `
+confluentinc/cp-kafka:7.5.0
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+5️⃣ Now u may run these services from Docker Desktop App. Then verify it's running using the command-
+
+docker ps
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+6️⃣ Other useful commands-
+
+-> To remove unused images to empty laptop's disk space-
+
+docker system prune -a
+
+-> To check the remaining images in the disk use command-
+
+docker images
+
+
+NOTE-
+This deletes all unused images/containers which are currently Inactive (stopped) and not in use. All containers (and their images) currently Running (started) won't be affected (They remain SAFE).
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+WebSockets-
+
+👉 Real-time updates (Socket.IO)
+→ Driver sees new ride instantly
+→ Customer sees status change live
+
+
+app.set("io", io);
+👉 What app.set() does:
+-> Stores a value inside Express app
+-> Works like a global variable container
+So now u can access info using req.app.get("io") in controller.
+
+📦 In your Socket.IO setup
+const io = new Server(server, {
+  cors: { origin: "*" }
+});
+
+What does origin: "*" mean?
+👉 It means: "Allow requests from ANY origin"
+So:
+-> React app 
+-> Postman 
+-> Any website
+
+👉 This allows:
+-> Frontend (React/Vite)
+-> Other clients
+to connect to your WebSocket server
+
+CORS = Cross-Origin Resource Sharing    
+CORS is a browser security feature.
+
+👉 It blocks requests when:
+Frontend and backend are on different origins
+Example:
+Frontend → http://localhost:5173 (your Vite app 👀)
+Backend → http://localhost:5000
+
+
+
+🔥 1. What Socket.IO was doing earlier
+👉 Earlier flow:
+Controller → io.emit() → Client (browser)
+When ride created → directly sent to frontend
+Works only if single server
+
+🔥 2. What Redis Pub/Sub is doing now
+👉 New flow: [Controller → Redis (publish) → Socket server (subscribe) → Client]
+👉 Publisher = your controller (where you do `pub.publish(...)`)
+👉 Subscriber = your backend Redis listener (where `sub.subscribe(...)` and then calls `io.emit(...)`)
+Simple meaning:
+Redis = middleman / message broker
+👉 Why needed?
+-> If you have multiple servers
+-> One server creates ride
+-> Another server sends to users
+⚡ One-line difference
+Socket.IO earlier → direct send
+Redis now → indirect via broker (scalable)
+Real-life Example:
+Without Redis → teacher talks directly to 1 class
+With Redis → teacher announces → speaker system → all classes hear
+
+🔥 3. What these events mean
+🟢 Create Ride
+new_ride
+👉 A customer booked a ride
+🟡 Accept Ride
+ride_accepted
+👉 A driver accepted the ride
+🔵 Update Status
+ride_status_updated
+👉 Ride is ongoing / completed
+
+
+1. Are socket server and io different?
+👉 No, they are basically the same thing
+const io = new Server(server);
+io = your Socket.IO server instance
+👉 So, io = socket server ✅
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+Redis = Multi-purpose tool
+“Super fast in-memory data engine”
+
+1. Caching
+DB → Redis → Fast access
+👉 Store frequently used data
+
+🔹 2. Queue (jobs)
+Task → Redis queue → Worker processes it
+👉 Background jobs (emails, payments)
+
+🔹 3. Pub/Sub (your case)
+Publisher → Redis → Subscriber
+👉 Real-time messaging between services
+
+🔹 4. Locking
+User locks seat → Redis prevents others
+👉 Concurrency control
+
+
+Why Redis can do all this?
+Because:
+-> It stores data in RAM (very fast)
+-> Supports different data structures
+-> Has built-in features (pub/sub, streams, etc.)
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+KAFKA-
+
+Use-
+You created a ride → many systems need to know:
+1. Driver Service → assign driver 🚗
+2. Notification Service → send SMS 🔔
+3. Billing Service → calculate fare 💰
+4. Analytics → track rides 📊
+
+👉 Instead of calling all APIs directly ❌
+👉 You just send ONE event to Kafka ✅
+
+
+
+Why we used both Redis and Kafka in this project?
+
+🔴Redis Flow-    [Redis Pub/Sub → Socket.IO → Browser] 
+Purpose:
+1. Instantly update UI
+2. Show “New Ride Created” in real-time
+Nature:
+  ⚡ Super fast
+  ❌ Not stored
+  ❌ If missed → gone forever
+-----------------------------------------------------
+🟡Kafka Flow-    [Producer → Kafka → Consumer]
+Purpose:
+1. Notify other backend services
+Example:
+1. Driver service assigns driver
+2. Notification service sends SMS
+3. Analytics logs ride
+
+
+🔥 Why BOTH are used together? 
+
+1. If only Redis-
+-> No reliability
+-> Backend services may miss events
+
+2. If only Kafka-
+-> UI won’t update instantly
+
+🚀 Interview line:
+Redis is used for real-time UI updates via Pub/Sub and Socket.IO, while Kafka is used for reliable event-driven communication between backend services with persistence and scalability.
+
+-------------------------------------------------------------------------------------------XXXX--------------------------------------------------------------------------------------
+
+NGINX-
+
+We ran Nginx command (through docker)-
+docker run -d -p 8080:80 -v %cd%/infra/nginx.conf:/etc/nginx/nginx.conf nginx
+
+IMPORTANT PART-
+👉 -p 8080:80
+
+This means:
+Your system port → Container port
+       8080      →     80
+
+So what happens?
+-> NGINX runs inside Docker on port 80
+-> But you access it from your PC using port 8080
+
+👉 That’s why:
+http://localhost:8080  → goes to → NGINX (port 80 inside container)
+
+Request Flow-
+Before NGINX:     Frontend  --->  http://localhost:5002/api/rides
+
+After NGINX:      Frontend  --->  http://localhost:8080/api/rides  --->  NGINX  --->  http://localhost:5002/api/rides
+
+What happens after NGINX is connected- 
+👉 Frontend → calls 8080
+👉 8080 = NGINX (gateway)
+👉 NGINX → forwards to 5002 (ride service)
+So, Frontend calls the API Gateway (NGINX on 8080), which internally routes requests to backend services like 5002.
+
+Why port changed?
+Because now:
+-> You are NOT calling services directly
+-> You are calling NGINX gateway
+
+In simple terms:
+-> Before: You directly call each service
+-> After: You call ONE door → NGINX → it decides where to send
+
+
+
+⚡ NGINX Rule (memorize this)-
+------------------------------------
+🔴 Case 1 — WITH trailing /
+
+location /api/rides/ {
+  proxy_pass http://backend/;
+}
+
+👉 NGINX REPLACES the matching part
+/api/rides/123  →  /123
+------------------------------------
+🟢 Case 2 — WITHOUT trailing /
+
+location /api/rides/ {
+  proxy_pass http://backend;
+}
+
+👉 NGINX KEEPS the full path
+/api/rides/123  →  /api/rides/123
+------------------------------------
+Eg-
+You have:
+app.use("/api/rides", rideRoutes);
+
+So backend expects:
+/api/rides
+
+👉 That’s why you needed:
+proxy_pass http://backend; // no slash
+
+
+👉 BOTH styles are valid (depends on architecture)-
+---------------------------------------------------------
+✅ Style 1 (your current — common in microservices)
+
+location /api/rides/ {
+  proxy_pass http://ride-service;
+}
+
+✔ Keeps route intact
+✔ Gateway is transparent
+---------------------------------------------------------
+✅ Style 2 (used in many companies)
+
+location /rides/ {
+  proxy_pass http://ride-service/;
+}
+
+✔ Gateway rewrites path
+✔ Backend sees clean routes
+---------------------------------------------------------
+
+
+Also earlier I used-
+
+location /api/rides/ {
+  proxy_pass http://host.docker.internal:5002;
+}
+
+Rule:
+location /api/rides/ {...} → matches only URLs with trailing slash
+
+So:
+-> /api/rides/ works✅
+-> /api/rides may not match correctly❌
+
+Production Best Practice-
+Handle both cases (with & without /) by not using a trailing slash (/) after URL route in nginx.conf
+
+So now it becomes-
+location /api/rides {...}
+
+Why this is better?
+1. Works for:
+  -> /api/rides
+  -> /api/rides/
+  -> /api/rides/accept
+2. Cleaner
+3. Production-safe
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+Production Safety-
+
+In rideController.js in acceptRide-
+
+We replaced-
+  const { rideId, driverId } = req.body;  
+with this-
+  const { rideId } = req.body;
+  const driverId = req.user.id;
+
+Because-
+| Feature                                | Status      |
+| -------------------------------------- | ------------|
+| Authentication (login)                 | ✅ working  |
+| Authorization (correct identity usage) | ❌ broken   |
+
+
+Where does req.user come from?
+
+From your auth middleware:
+const decoded = jwt.verify(token, secret);
+req.user = decoded;
+
+Example JWT payload:
+{
+  "id": "driver_1",
+  "role": "driver"
+}
+
+Now flow becomes:
+
+Client → sends token
+          ↓
+Backend verifies token
+          ↓
+req.user = { id: "driver_1" }
+          ↓
+driverId = req.user.id ✅
+
+So no spoofing/spamming of fake drivers sending fake driverId's.
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+Different types of ID's used in ride-service-
+
+🔹 1. id (Generic User ID)
+👉 Comes from JWT token
+👉 Represents currently logged-in user
+
+Example (JWT payload)
+{
+  "id": "user_2",
+  "role": "driver"
+}
+
+👉 Usage:
+req.user.id
+
+🔹 2. customerId
+👉 ID of user who creates the ride
+👉 Comes from JWT (NOT request body)
+👉 Stored inside Ride
+
+Example (DB)
+{
+  "_id": "ride_123",
+  "customerId": "user_1"
+}
+
+🔹 3. driverId
+👉 ID of user who accepts the ride
+👉 Comes from JWT (NOT request body)
+
+Example (after accept)
+{
+  "_id": "ride_123",
+  "driverId": "user_2"
+}
+
+🔹 4. rideId
+👉 ID of the ride itself
+
+Example:
+rideId = "ride_123"
+
+
+🔥 Flow with Examples-
+
+🟢 Step 1 — Customer logs in
+
+📩 Request
+POST /api/auth/login
+{
+  "email": "customer@test.com",
+  "password": "123456"
+}
+📤 Response
+{
+  "token": "abc123..."
+}
+👉 Token contains:
+{
+  "id": "user_1",
+  "role": "customer"
+}
+
+🟢 Step 2 — Customer creates ride (with login)
+
+📩 Request (Postman)
+POST /api/rides
+Headers:
+Authorization: Bearer abc123...
+Body:
+{
+  "pickupLocation": "A",
+  "dropLocation": "B"
+}
+⚙️ Backend logic
+const customerId = req.user.id;
+📤 Response
+{
+  "_id": "ride_123",
+  "customerId": "user_1",
+  "status": "requested"
+}
+👉 _id = rideId
+
+
+
+🟢 Step 3 — Driver logs in
+
+📩 Request
+POST /api/auth/login
+{
+  "email": "driver@test.com",
+  "password": "123456"
+}
+📤 Response
+{
+  "token": "xyz456..."
+}
+👉 Token contains:
+{
+  "id": "user_2",
+  "role": "driver"
+}
+
+🟢 Step 4 — Driver accepts ride
+
+📩 Request
+POST /api/rides/accept
+Headers:
+Authorization: Bearer xyz456...
+Body:
+{
+  "rideId": "ride_123"
+}
+⚙️ Backend logic
+const driverId = req.user.id;
+📤 Response
+{
+  "_id": "ride_123",
+  "customerId": "user_1",
+  "driverId": "user_2",
+  "status": "accepted"
+}
+
+
+🎯 Summary:
+
+req.user.id → actual logged-in user
+
+if role = customer → becomes customerId
+if role = driver   → becomes driverId
+
+ride._id → rideId
+
+
+🎯 Quick Table (for revision):
+
+Variable      Meaning               Source
+------------------------------------------
+id            logged-in user       JWT
+customerId    ride creator         JWT
+driverId      ride accepter        JWT
+rideId        ride identifier      DB (_id)
+
+
+🎯 One-line Memory Trick:
+
+User → id
+Ride → rideId
+User in ride → customerId / driverId
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+In rideController.js inside createRide() function-
+
+const { pickupLocation, dropLocation } = req.body;         // Only pass pickup & drop locations in Request Body of Postman (which comes inside req.body thru express.json() middleware)
+const customerId = req.user.id;                            // Secure customerId from JWT already being received so no need to pass customerId in the Request Body.
+Ride.create({ customerId, pickupLocation, dropLocation }); // So all 3 requirements of Ride.create() ie. customerId, pickup, drop locations are coming form somewhere or the other ie. 
+                                                           // none should be empty as all 3 have "required" field in the models/Ride.js.
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+📊 FINAL ARCHITECTURE NOW-
+
+Client → NGINX → Services
+                  ├ Auth Service
+                  ├ Ride Service
+                  └ Notification Service
+
+Ride Service → Kafka → Notification Service
+Ride Service → Redis → Socket.IO → Client
+
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+Rate Limiting-
+
+npm i express-rate-limit
+
+Inside middleware folder of ride-service.
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+Install mongoose inside notification-service folder-
+
+npm i mongoose
+
+Helps to store Notifications in DB instead of just logging them (in terminal).
+
+------------------------------------------------------------------------------------------XXXX------------------------------------------------------------------------------------
+
+Live Driver Location Tracking (Uber-level feature)-
+
+GOAL-
+Driver sends location → server
+Server broadcasts → clients (customer/dashboard)
+
+In ride-service/index.js in Socket.io connection we do this upgrade.
+
+🔥 Now Flow-
+Driver joins room → driverId
+Customer listens → same room
+Only relevant updates sent
