@@ -108,5 +108,5 @@ Metrics & monitoring
 ## 👨‍💻 Author
 
 Aman Nigam
-GitHub: https://github.com/AmanNigam16
-LinkedIn: https://linkedin.com
+GitHub: [https://github.com/AmanNigam16](https://github.com/AmanNigam16)
+LinkedIn: [https://linkedin.com/AmanNigam16](https://www.linkedin.com/in/AmanNigam16)
